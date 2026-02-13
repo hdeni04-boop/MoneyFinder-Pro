@@ -4,8 +4,8 @@ import { Language, Opportunity } from '../types.ts';
 import { translations } from '../translations.ts';
 
 interface SidebarProps {
-  activeTab: 'opportunities' | 'sources' | 'logs' | 'analytics' | 'vault';
-  setActiveTab: (tab: 'opportunities' | 'sources' | 'logs' | 'analytics' | 'vault') => void;
+  activeTab: 'opportunities' | 'sources' | 'logs' | 'analytics' | 'vault' | 'video';
+  setActiveTab: (tab: 'opportunities' | 'sources' | 'logs' | 'analytics' | 'vault' | 'video') => void;
   isScraping: boolean;
   onScrapeNow: () => void;
   language: Language;
@@ -53,6 +53,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isScraping, 
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           {t.opportunities}
+        </button>
+        <button 
+          onClick={() => setActiveTab('video')}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+            activeTab === 'video' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white hover:bg-slate-800/50'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+          {t.videoIntel}
         </button>
         <button 
           onClick={() => setActiveTab('analytics')}

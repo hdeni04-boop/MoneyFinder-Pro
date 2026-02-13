@@ -14,8 +14,11 @@ import ManualOpportunityForm from './components/ManualOpportunityForm.tsx';
 import AnalyticsTab from './components/AnalyticsTab.tsx';
 import VaultTab from './components/VaultTab.tsx';
 import LandingPage from './components/LandingPage.tsx';
+import VideoAnalysisTab from './components/VideoAnalysisTab.tsx';
 
 const ITEMS_PER_PAGE = 12;
+
+type AppTab = 'opportunities' | 'sources' | 'logs' | 'analytics' | 'vault' | 'video';
 
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'landing' | 'dashboard'>('landing');
@@ -23,7 +26,7 @@ const App: React.FC = () => {
   const [sources, setSources] = useState<Source[]>([]);
   const [logs, setLogs] = useState<ScrapingLog[]>([]);
   const [isScraping, setIsScraping] = useState(false);
-  const [activeTab, setActiveTab] = useState<'opportunities' | 'sources' | 'logs' | 'analytics' | 'vault'>('opportunities');
+  const [activeTab, setActiveTab] = useState<AppTab>('opportunities');
   const [searchQuery, setSearchQuery] = useState('');
   const [riskFilter, setRiskFilter] = useState<RiskLevel | 'All'>('All');
   const [language, setLanguage] = useState<Language>('id');
@@ -127,7 +130,7 @@ const App: React.FC = () => {
       try {
         addLog(`${t.activePulling}: ${source.name}`, 'info');
         
-        // Always update lastRun timestamp regardless of success or failure
+        // Always update lastRun timestamp
         const currentTimestamp = new Date().toISOString();
         setSources(prev => prev.map(s => s.id === source.id ? { ...s, lastRun: currentTimestamp } : s));
 
@@ -169,15 +172,14 @@ const App: React.FC = () => {
         }
       } catch (error) {
         addLog(`System failure on ${source.name}: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
-        // We continue to the next source despite this one failing
       }
     }
     
     if (totalAddedCount > 0) {
-      addLog(`Scan complete. ${totalAddedCount} signals identified across active sources.`, 'success');
-      chatBotRef.current?.triggerBriefing(`Market scan complete. Identified ${totalAddedCount} high-potential business signals.`);
+      addLog(`Scan complete. ${totalAddedCount} signals identified.`, 'success');
+      chatBotRef.current?.triggerBriefing(`Market scan complete. Identified ${totalAddedCount} signals.`);
     } else {
-      addLog("Scan complete. No new signals detected in this cycle.", 'info');
+      addLog("Scan complete. No new signals detected.", 'info');
     }
     
     setIsScraping(false);
@@ -206,8 +208,8 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-[#070b14] text-slate-200 overflow-hidden font-sans relative">
       <Sidebar 
-        activeTab={activeTab as any} 
-        setActiveTab={setActiveTab as any} 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
         isScraping={isScraping}
         onScrapeNow={runScraper}
         language={language}
@@ -284,6 +286,7 @@ const App: React.FC = () => {
           {activeTab === 'analytics' && <AnalyticsTab opportunities={opportunities} language={language} />}
           {activeTab === 'vault' && <VaultTab language={language} balance={walletBalance} transactions={transactions} onWithdraw={handleWithdraw} />}
           {activeTab === 'sources' && <SourceManager sources={sources} language={language} onAdd={(d) => setSources(prev => [...prev, { ...d, id: Math.random().toString(36).substr(2, 9), isActive: true }])} onUpdate={(u) => setSources(prev => prev.map(s => s.id === u.id ? u : s))} onDelete={(id) => setSources(prev => prev.filter(s => s.id !== id))} onToggleActive={(id) => setSources(prev => prev.map(s => s.id === id ? { ...s, isActive: !s.isActive } : s))} />}
+          {activeTab === 'video' && <VideoAnalysisTab language={language} />}
           {activeTab === 'logs' && (
             <div className="max-w-4xl mx-auto space-y-6">
               <div className="bg-[#0f172a] rounded-3xl border border-slate-800 p-8 font-mono text-[11px] h-[calc(100vh-200px)] overflow-y-auto custom-scrollbar">

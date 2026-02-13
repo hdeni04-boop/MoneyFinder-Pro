@@ -98,3 +98,46 @@ export const simulateScraping = async (sourceName: string) => {
         return [];
     }
 };
+
+export const analyzeVideo = async (videoBase64: string, mimeType: string, lang: Language) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `Analyze this business/market intelligence video and extract critical insights. 
+  Language: ${lang === 'id' ? 'Indonesian' : 'English'}.
+  Provide the output in JSON format with these exact keys:
+  - mainTopic: String (The core narrative of the video)
+  - keyTakeaways: Array of Strings (At least 3 critical points)
+  - identifiedOpportunities: Array of Strings (Potential business or investment leads)
+  - riskAssessment: String (Overall risk profile based on the content)`;
+
+  try {
+    const response = await callWithRetry(() => ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: {
+        parts: [
+          { inlineData: { data: videoBase64, mimeType } },
+          { text: prompt }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            mainTopic: { type: Type.STRING },
+            keyTakeaways: { type: Type.ARRAY, items: { type: Type.STRING } },
+            identifiedOpportunities: { type: Type.ARRAY, items: { type: Type.STRING } },
+            riskAssessment: { type: Type.STRING }
+          },
+          required: ["mainTopic", "keyTakeaways", "identifiedOpportunities", "riskAssessment"]
+        }
+      }
+    }));
+
+    const text = response.text || "{}";
+    return JSON.parse(cleanJsonResponse(text));
+  } catch (error) {
+    console.error("Video Analysis Error:", error);
+    throw error;
+  }
+};

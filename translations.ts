@@ -1,7 +1,18 @@
 
 export const translations = {
   en: {
-    // ... existing translations ...
+    videoIntel: "Video Intel",
+    uploadVideo: "Upload Market Video",
+    analyzeVideo: "Analyze Video",
+    analyzingVideo: "Processing Video...",
+    videoAnalysisResults: "Quantum Video Insights",
+    dropVideo: "Drop video signal here or click to browse",
+    videoLimits: "Supported formats: MP4, WebM. Max 20MB recommended.",
+    mainTopic: "Core Narrative",
+    keyTakeaways: "Key Intelligence",
+    bizOpps: "Identified Alpha",
+    riskAssessment: "Risk Matrix",
+    // Existing translations...
     websiteUrl: "Website URL",
     deployInstruction: "To get a professional .vercel.app link, deploy your code to Vercel (Free).",
     urlPlaceholder: "Enter your live app URL",
@@ -14,7 +25,6 @@ export const translations = {
     complianceCheck: "Compliance Checklist",
     pseStatus: "PSE Kominfo Status",
     amlActive: "AML Protocol Active",
-    // Keep existing keys below...
     confirmWithdrawal: "Protocol Verification",
     reviewSummary: "Transaction Summary",
     totalDebit: "Total Amount",
@@ -132,7 +142,18 @@ export const translations = {
     amlProtocol: "Anti-Money Laundering (AML) Protocol Active"
   },
   id: {
-    // ... existing translations ...
+    videoIntel: "Intel Video",
+    uploadVideo: "Unggah Video Pasar",
+    analyzeVideo: "Analisa Video",
+    analyzingVideo: "Memproses Video...",
+    videoAnalysisResults: "Wawasan Video Quantum",
+    dropVideo: "Letakkan sinyal video di sini atau klik untuk cari",
+    videoLimits: "Format didukung: MP4, WebM. Maks 20MB disarankan.",
+    mainTopic: "Narasi Utama",
+    keyTakeaways: "Intelijen Kunci",
+    bizOpps: "Alpha Teridentifikasi",
+    riskAssessment: "Matriks Risiko",
+    // Existing translations...
     websiteUrl: "Website URL",
     deployInstruction: "Untuk mendapatkan link .vercel.app profesional, deploy kode Anda ke Vercel (Gratis).",
     urlPlaceholder: "Masukkan URL aplikasi live Anda",
@@ -145,7 +166,6 @@ export const translations = {
     complianceCheck: "Ceklist Kepatuhan",
     pseStatus: "Status PSE Kominfo",
     amlActive: "Protokol AML Aktif",
-    // Keep existing keys below...
     confirmWithdrawal: "Verifikasi Protokol",
     reviewSummary: "Ringkasan Transaksi",
     totalDebit: "Total Jumlah",
