@@ -119,14 +119,23 @@ const App: React.FC = () => {
     if (isScraping) return;
     setIsScraping(true);
     addLog(t.scraping, 'info');
-    let totalAdded = 0;
+    let totalAddedCount = 0;
     
-    try {
-      const activeSources = sources.filter(s => s.isActive);
-      for (const source of activeSources) {
+    const activeSources = sources.filter(s => s.isActive);
+    
+    for (const source of activeSources) {
+      try {
         addLog(`${t.activePulling}: ${source.name}`, 'info');
+        
+        // Always update lastRun timestamp regardless of success or failure
+        const currentTimestamp = new Date().toISOString();
+        setSources(prev => prev.map(s => s.id === source.id ? { ...s, lastRun: currentTimestamp } : s));
+
         const rawItems = await simulateScraping(source.name);
-        if (!rawItems || rawItems.length === 0) continue;
+        if (!rawItems || rawItems.length === 0) {
+          addLog(`No new signals found for ${source.name}`, 'warning');
+          continue;
+        }
 
         const scoredItems = await scoreOpportunities(rawItems, source.type, source.name, language);
 
@@ -150,27 +159,28 @@ const App: React.FC = () => {
         }));
 
         if (newOpps.length > 0) {
-          totalAdded += newOpps.length;
+          totalAddedCount += newOpps.length;
           setOpportunities(prev => {
-            // Deduplicate by title to prevent spamming
             const existingTitles = new Set(prev.map(o => o.title));
             const filteredNew = newOpps.filter(o => !existingTitles.has(o.title));
             return [...filteredNew, ...prev].slice(0, 500);
           });
+          addLog(`Identified ${newOpps.length} signals from ${source.name}`, 'success');
         }
+      } catch (error) {
+        addLog(`System failure on ${source.name}: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+        // We continue to the next source despite this one failing
       }
-      
-      if (totalAdded > 0) {
-        addLog(`Scan complete. ${totalAdded} signals identified.`, 'success');
-        chatBotRef.current?.triggerBriefing(`Market scan complete. Identified ${totalAdded} high-potential business signals.`);
-      } else {
-        addLog("Scan complete. No new signals detected.", 'info');
-      }
-    } catch (error) {
-      addLog(`System failure: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
-    } finally {
-      setIsScraping(false);
     }
+    
+    if (totalAddedCount > 0) {
+      addLog(`Scan complete. ${totalAddedCount} signals identified across active sources.`, 'success');
+      chatBotRef.current?.triggerBriefing(`Market scan complete. Identified ${totalAddedCount} high-potential business signals.`);
+    } else {
+      addLog("Scan complete. No new signals detected in this cycle.", 'info');
+    }
+    
+    setIsScraping(false);
   };
 
   const processedOpportunities = useMemo(() => {
