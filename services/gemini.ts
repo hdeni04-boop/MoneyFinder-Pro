@@ -5,6 +5,7 @@ import { Opportunity, CollectorType, Language } from "../types.ts";
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const cleanJsonResponse = (text: string): string => {
+  // Remove markdown code blocks if present
   return text.replace(/```json/g, '').replace(/```/g, '').trim();
 };
 
