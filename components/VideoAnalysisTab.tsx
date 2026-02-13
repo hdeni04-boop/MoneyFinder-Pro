@@ -1,6 +1,6 @@
 
-import React, { useState, useRef } from 'react';
-import { Language } from '../types.ts';
+import React, { useState, useRef, useEffect } from 'react';
+import { Language, VideoAnalysisResult } from '../types.ts';
 import { translations } from '../translations.ts';
 import { analyzeVideo } from '../services/gemini.ts';
 
@@ -13,8 +13,20 @@ const VideoAnalysisTab: React.FC<VideoAnalysisTabProps> = ({ language }) => {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<VideoAnalysisResult['analysis'] | null>(null);
+  const [pastAnalyses, setPastAnalyses] = useState<VideoAnalysisResult[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    try {
+      const savedAnalyses = localStorage.getItem('mf_video_analyses');
+      if (savedAnalyses) {
+        setPastAnalyses(JSON.parse(savedAnalyses));
+      }
+    } catch (error) {
+      console.error("Failed to load video analyses from localStorage", error);
+    }
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -38,6 +50,19 @@ const VideoAnalysisTab: React.FC<VideoAnalysisTabProps> = ({ language }) => {
         const base64 = (reader.result as string).split(',')[1];
         const analysis = await analyzeVideo(base64, videoFile.type, language);
         setResults(analysis);
+
+        const newAnalysisResult: VideoAnalysisResult = {
+          id: `va-${Date.now()}`,
+          filename: videoFile.name,
+          timestamp: new Date().toISOString(),
+          analysis: analysis,
+        };
+
+        setPastAnalyses(prev => {
+          const updatedAnalyses = [newAnalysisResult, ...prev].slice(0, 10);
+          localStorage.setItem('mf_video_analyses', JSON.stringify(updatedAnalyses));
+          return updatedAnalyses;
+        });
         setIsAnalyzing(false);
       };
     } catch (error) {
@@ -46,6 +71,27 @@ const VideoAnalysisTab: React.FC<VideoAnalysisTabProps> = ({ language }) => {
       setIsAnalyzing(false);
     }
   };
+
+  const handleViewAnalysis = (analysisResult: VideoAnalysisResult) => {
+    setResults(analysisResult.analysis);
+    setVideoFile(null);
+    setVideoPreview(null);
+  };
+
+  const handleDeleteAnalysis = (idToDelete: string) => {
+    const isCurrentlyViewing = results && pastAnalyses.find(a => a.id === idToDelete)?.analysis === results;
+
+    setPastAnalyses(prev => {
+        const updatedAnalyses = prev.filter(a => a.id !== idToDelete);
+        localStorage.setItem('mf_video_analyses', JSON.stringify(updatedAnalyses));
+        return updatedAnalyses;
+    });
+
+    if (isCurrentlyViewing) {
+        setResults(null);
+    }
+  };
+
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -150,6 +196,45 @@ const VideoAnalysisTab: React.FC<VideoAnalysisTabProps> = ({ language }) => {
           </div>
         </div>
       </div>
+
+      {pastAnalyses.length > 0 && (
+        <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl backdrop-blur-md shadow-2xl">
+            <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Analysis History
+                </div>
+                <button 
+                    onClick={() => {
+                        if (confirm('Are you sure you want to clear all analysis history?')) {
+                            setPastAnalyses([]);
+                            localStorage.removeItem('mf_video_analyses');
+                            setResults(null);
+                        }
+                    }}
+                    className="text-[10px] font-black uppercase text-rose-500 hover:text-rose-400 transition-colors"
+                >
+                    Clear All
+                </button>
+            </h3>
+            <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+                {pastAnalyses.map(item => (
+                    <div key={item.id} className="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl flex items-center justify-between gap-4 group">
+                        <div>
+                            <p className="text-sm font-bold text-white truncate max-w-xs">{item.filename}</p>
+                            <p className="text-[10px] text-slate-500 font-medium">{new Date(item.timestamp).toLocaleString()}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => handleViewAnalysis(item)} className="px-3 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 text-[10px] font-black uppercase hover:bg-indigo-600/40 transition-colors">View</button>
+                            <button onClick={() => handleDeleteAnalysis(item.id)} className="p-2 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 opacity-50 group-hover:opacity-100 transition-opacity">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+      )}
 
       <div className="bg-indigo-600/5 border border-indigo-600/20 p-6 rounded-2xl">
          <p className="text-xs text-indigo-400 font-bold leading-relaxed flex items-center gap-2">

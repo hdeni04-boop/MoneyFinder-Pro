@@ -1,4 +1,5 @@
 
+
 export enum CollectorType {
   RSS = 'RSS',
   API = 'API',
@@ -52,4 +53,16 @@ export interface ScrapingLog {
   timestamp: string;
   message: string;
   level: 'info' | 'success' | 'error' | 'warning';
+}
+
+export interface VideoAnalysisResult {
+  id: string;
+  filename: string;
+  timestamp: string;
+  analysis: {
+    mainTopic: string;
+    keyTakeaways: string[];
+    identifiedOpportunities: string[];
+    riskAssessment: string;
+  };
 }
