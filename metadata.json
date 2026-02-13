@@ -1,0 +1,5 @@
+{
+  "name": "MoneyFinder Pro",
+  "description": "A high-performance opportunity discovery and scoring engine based on the MoneyFinder.exe architecture. Features automated scraping, AI-driven scoring via Gemini, and comprehensive source management.",
+  "requestFramePermissions": []
+}
