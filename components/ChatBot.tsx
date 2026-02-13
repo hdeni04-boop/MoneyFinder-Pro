@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Language, Opportunity } from '../types.ts';
@@ -19,7 +18,7 @@ interface ChatBotProps {
   opportunities: Opportunity[];
   totalROI: number;
   onExecuteScan: () => void;
-  onNavigate: (tab: 'opportunities' | 'sources' | 'logs' | 'analytics' | 'vault') => void;
+  onNavigate: (tab: 'opportunities' | 'sources' | 'logs' | 'analytics' | 'vault' | 'video') => void;
   onSearch: (query: string) => void;
 }
 
@@ -37,7 +36,7 @@ const controlTools: FunctionDeclaration[] = [
       properties: {
         tabName: { 
           type: Type.STRING, 
-          enum: ['opportunities', 'sources', 'logs', 'analytics', 'vault'],
+          enum: ['opportunities', 'sources', 'logs', 'analytics', 'vault', 'video'],
           description: 'The tab to navigate to.' 
         }
       },
@@ -78,12 +77,12 @@ const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(({
     "How do I withdraw funds?",
     "Analyze current market trends",
     "Scan for new alpha signals",
-    "Show me my analytics"
+    "Go to Video Intelligence"
   ] : [
     "Bagaimana cara tarik dana?",
     "Analisa tren pasar saat ini",
     "Pindai sinyal alpha baru",
-    "Tampilkan analitik saya"
+    "Buka Intelijen Video"
   ];
 
   useImperativeHandle(ref, () => ({
@@ -115,27 +114,22 @@ const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(({
         APP FEATURES:
         1. Alpha Terminal (opportunities): View and execute signals. Marking a signal as 'Cashed' earns 5% commission.
         2. Market Intel (analytics): View ROI distribution and risk profiles.
-        3. Global Vault (vault): Manage balance. Withdraw to Banks (BCA, etc.), E-Wallets (DANA, OVO, GoPay), or Retail (Indomaret/Alfamart).
-        4. Feed Sources (sources): Add/Remove data scrapers (RSS, API, Web).
-        5. Protocol Logs (logs): System activity monitoring.
+        3. Global Vault (vault): Manage balance and payouts via Xendit.
+        4. Video Intel (video): Analyze market videos using Gemini Pro.
+        5. Feed Sources (sources): Add/Remove data scrapers (RSS, API, Web).
+        6. Protocol Logs (logs): System activity monitoring.
       `;
 
       const currentStats = `
         CURRENT STATUS:
         - Total Opportunities: ${opportunities.length}
         - Total Potential ROI: $${totalROI.toLocaleString()}
-        - Latest Signals: ${opportunities.slice(0, 3).map(o => o.title).join(', ')}
       `;
 
       const systemInstruction = `
         You are "SENTINEL", the Autonomous Chief Strategy Officer for MoneyFinder Pro.
         ${featureMap}
         ${currentStats}
-        
-        CAPABILITIES:
-        - Answer questions about features based on the provided map.
-        - Provide strategic insights by analyzing the current ${opportunities.length} signals.
-        - Trigger tools for navigation, scanning, and searching.
         
         Tone: Professional, precise, elite. Language: ${language === 'id' ? 'Indonesian' : 'English'}.
       `;
@@ -205,7 +199,7 @@ const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(({
                 </div>
                 <div>
                    <p className="text-xs text-indigo-400 font-black uppercase tracking-[0.2em]">{isEn ? 'System Idle' : 'Sistem Siaga'}</p>
-                   <p className="text-[10px] text-slate-500 mt-2 font-medium">{isEn ? 'Ask me about market trends or how to use MoneyFinder Pro.' : 'Tanya saya tentang tren pasar atau cara menggunakan MoneyFinder Pro.'}</p>
+                   <p className="text-[10px] text-slate-500 mt-2 font-medium">{isEn ? 'Ask me about market trends or navigate the terminal.' : 'Tanya saya tentang tren pasar atau navigasi terminal.'}</p>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-2 w-full pt-4">

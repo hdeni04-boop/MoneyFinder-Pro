@@ -1,12 +1,26 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Opportunity, CollectorType, Language } from "../types.ts";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const cleanJsonResponse = (text: string): string => {
-  // Remove markdown code blocks if present
-  return text.replace(/```json/g, '').replace(/```/g, '').trim();
+  if (!text) return "{}";
+  // Menghapus blok kode markdown jika ada
+  let cleaned = text.replace(/```json/gi, '').replace(/```/gi, '').trim();
+  
+  // Mencari karakter awal JSON '{' atau '['
+  const startIdx = Math.min(
+    cleaned.indexOf('{') === -1 ? Infinity : cleaned.indexOf('{'),
+    cleaned.indexOf('[') === -1 ? Infinity : cleaned.indexOf('[')
+  );
+  // Mencari karakter akhir JSON '}' atau ']'
+  const endIdx = Math.max(
+    cleaned.lastIndexOf('}'),
+    cleaned.lastIndexOf(']')
+  );
+  
+  if (startIdx === Infinity || endIdx === -1) return cleaned;
+  return cleaned.substring(startIdx, endIdx + 1);
 };
 
 const callWithRetry = async (fn: () => Promise<any>, maxRetries = 3) => {
@@ -18,7 +32,8 @@ const callWithRetry = async (fn: () => Promise<any>, maxRetries = 3) => {
       lastError = error;
       const isQuotaError = error?.message?.includes('429') || error?.status === 429 || error?.message?.includes('quota');
       if (isQuotaError) {
-        await sleep(Math.pow(2, i) * 1000 + Math.random() * 1000);
+        // Exponential backoff
+        await sleep(Math.pow(2, i) * 1000 + 1000);
         continue;
       }
       throw error;
@@ -59,7 +74,8 @@ export const scoreOpportunities = async (rawItems: any[], sourceType: CollectorT
     }));
 
     const text = response.text || "[]";
-    return JSON.parse(cleanJsonResponse(text)).map((r: any) => ({ 
+    const jsonStr = cleanJsonResponse(text);
+    return JSON.parse(jsonStr).map((r: any) => ({ 
       ...r, 
       isPremium: r.score > 85,
       id: `opt-${Math.random().toString(36).substr(2, 9)}`
