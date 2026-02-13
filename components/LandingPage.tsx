@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Language } from '../types';
+import { Language } from '../types.ts';
 
 interface LandingPageProps {
   language: Language;

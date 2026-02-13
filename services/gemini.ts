@@ -4,6 +4,10 @@ import { Opportunity, CollectorType, Language } from "../types.ts";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const cleanJsonResponse = (text: string): string => {
+  return text.replace(/```json/g, '').replace(/```/g, '').trim();
+};
+
 const callWithRetry = async (fn: () => Promise<any>, maxRetries = 3) => {
   let lastError: any;
   for (let i = 0; i < maxRetries; i++) {
@@ -12,11 +16,8 @@ const callWithRetry = async (fn: () => Promise<any>, maxRetries = 3) => {
     } catch (error: any) {
       lastError = error;
       const isQuotaError = error?.message?.includes('429') || error?.status === 429 || error?.message?.includes('quota');
-      const isServerError = error?.status >= 500;
-      
-      if (isQuotaError || isServerError) {
-        const waitTime = Math.pow(2, i) * 1000 + Math.random() * 1000;
-        await sleep(waitTime);
+      if (isQuotaError) {
+        await sleep(Math.pow(2, i) * 1000 + Math.random() * 1000);
         continue;
       }
       throw error;
@@ -49,15 +50,7 @@ export const scoreOpportunities = async (rawItems: any[], sourceType: CollectorT
   try {
     const response = await callWithRetry(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `You are the Alpha Intelligence Engine. Analyze these market signals for extreme business value.
-      Language: ${lang === 'id' ? 'Bahasa Indonesia' : 'English'}.
-      
-      Evaluation Criteria:
-      - Score (0-100): 90+ means high urgency/alpha.
-      - financialValue: Estimated USD impact if executed correctly.
-      - riskLevel: Likelihood of failure.
-      
-      Signals to analyze: ${JSON.stringify(rawItems)}`,
+      contents: `Analyze these market signals. Lang: ${lang}. Signals: ${JSON.stringify(rawItems)}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: OPPORTUNITY_SCHEMA,
@@ -65,9 +58,14 @@ export const scoreOpportunities = async (rawItems: any[], sourceType: CollectorT
     }));
 
     const text = response.text || "[]";
-    return JSON.parse(text).map((r: any) => ({ ...r, isPremium: r.score > 85 }));
+    return JSON.parse(cleanJsonResponse(text)).map((r: any) => ({ 
+      ...r, 
+      isPremium: r.score > 85,
+      id: `opt-${Math.random().toString(36).substr(2, 9)}`
+    }));
   } catch (error) {
-    throw new Error("Analysis engine failed to process signals.");
+    console.error("Scoring Error:", error);
+    return [];
   }
 };
 
@@ -76,9 +74,7 @@ export const simulateScraping = async (sourceName: string) => {
     try {
         const response = await callWithRetry(() => ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `Simulate high-value market data for a professional alpha hunter.
-            Target Source: ${sourceName}
-            Requirement: Generate 3 realistic, high-impact business signals (funding, tech breakthroughs, arbitrage, or acquisitions).`,
+            contents: `Generate 3 high-impact business signals for ${sourceName}.`,
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
@@ -95,8 +91,9 @@ export const simulateScraping = async (sourceName: string) => {
             }
         }));
         const text = response.text || "[]";
-        return JSON.parse(text);
+        return JSON.parse(cleanJsonResponse(text));
     } catch (error) {
-        throw new Error("Network simulation error.");
+        console.error("Scraping Error:", error);
+        return [];
     }
 };

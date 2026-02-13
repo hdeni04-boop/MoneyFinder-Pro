@@ -28,7 +28,7 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, totalOpps,
     
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const top3 = opportunities.sort((a, b) => b.score - a.score).slice(0, 3);
+      const top3 = [...opportunities].sort((a, b) => b.score - a.score).slice(0, 3);
       
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -38,6 +38,7 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, totalOpps,
       
       setInsight(response.text || "Insight unavailable at this moment.");
     } catch (error) {
+      console.error("Header AI Error:", error);
       setInsight("Error connecting to intelligence engine.");
     } finally {
       setIsAnalysing(false);

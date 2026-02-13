@@ -37,36 +37,30 @@ const App: React.FC = () => {
   const chatBotRef = useRef<ChatBotHandle>(null);
   const t = translations[language];
 
+  // Load state from localStorage
   useEffect(() => {
-    const savedSources = localStorage.getItem('mf_sources');
-    const savedOpps = localStorage.getItem('mf_opportunities');
-    const savedWallet = localStorage.getItem('mf_wallet');
-    const savedTxs = localStorage.getItem('mf_transactions');
+    try {
+      const savedSources = localStorage.getItem('mf_sources');
+      const savedOpps = localStorage.getItem('mf_opportunities');
+      const savedWallet = localStorage.getItem('mf_wallet');
+      const savedTxs = localStorage.getItem('mf_transactions');
 
-    if (savedSources) {
-      const parsed: Source[] = JSON.parse(savedSources);
-      const existingUrls = new Set(parsed.map(s => s.url));
-      const missingSources = INITIAL_SOURCES.filter(s => !existingUrls.has(s.url));
+      if (savedSources) setSources(JSON.parse(savedSources));
+      else setSources(INITIAL_SOURCES);
       
-      if (missingSources.length > 0) {
-        const mergedSources = [...parsed, ...missingSources];
-        setSources(mergedSources);
-        localStorage.setItem('mf_sources', JSON.stringify(mergedSources));
-      } else {
-        setSources(parsed);
-      }
-    } else {
+      if (savedOpps) setOpportunities(JSON.parse(savedOpps));
+      if (savedWallet) setWalletBalance(JSON.parse(savedWallet));
+      if (savedTxs) setTransactions(JSON.parse(savedTxs));
+    } catch (e) {
+      console.error("Failed to load state", e);
       setSources(INITIAL_SOURCES);
     }
-    
-    if (savedOpps) setOpportunities(JSON.parse(savedOpps));
-    if (savedWallet) setWalletBalance(JSON.parse(savedWallet));
-    if (savedTxs) setTransactions(JSON.parse(savedTxs));
   }, []);
 
+  // Save state to localStorage
   useEffect(() => {
-    localStorage.setItem('mf_sources', JSON.stringify(sources));
-    localStorage.setItem('mf_opportunities', JSON.stringify(opportunities));
+    if (sources.length > 0) localStorage.setItem('mf_sources', JSON.stringify(sources));
+    if (opportunities.length > 0) localStorage.setItem('mf_opportunities', JSON.stringify(opportunities));
     localStorage.setItem('mf_wallet', JSON.stringify(walletBalance));
     localStorage.setItem('mf_transactions', JSON.stringify(transactions));
   }, [sources, opportunities, walletBalance, transactions]);
@@ -78,30 +72,31 @@ const App: React.FC = () => {
       message,
       level
     }, ...prev].slice(0, 100));
-  }, [language]);
+  }, []);
 
   const executeOpportunity = (oppId: string) => {
-    const opp = opportunities.find(o => o.id === oppId);
-    if (!opp || opp.status !== 'Open') return;
-
-    const earned = opp.financialValue * 0.05;
-    setWalletBalance(prev => prev + earned);
-    setOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, status: 'Executed' } : o));
-    
-    const tx: Transaction = {
-      id: `tx-${Date.now()}`,
-      type: 'earning',
-      amount: earned,
-      status: 'completed',
-      timestamp: new Date().toLocaleString()
-    };
-    setTransactions(prev => [tx, ...prev]);
-    addLog(`Realized ${earned.toLocaleString()} USD from signal: ${opp.title}`, 'success');
+    setOpportunities(prev => prev.map(o => {
+      if (o.id === oppId && o.status === 'Open') {
+        const earned = o.financialValue * 0.05;
+        setWalletBalance(prevBalance => prevBalance + earned);
+        
+        const tx: Transaction = {
+          id: `tx-${Date.now()}`,
+          type: 'earning',
+          amount: earned,
+          status: 'completed',
+          timestamp: new Date().toLocaleString()
+        };
+        setTransactions(prevTxs => [tx, ...prevTxs]);
+        addLog(`Alpha realized: +$${earned.toLocaleString()}`, 'success');
+        return { ...o, status: 'Executed' };
+      }
+      return o;
+    }));
   };
 
   const handleWithdraw = (amount: number, method: string) => {
     if (amount > walletBalance) return;
-    
     setWalletBalance(prev => prev - amount);
     const tx: Transaction = {
       id: `tx-${Date.now()}`,
@@ -112,74 +107,71 @@ const App: React.FC = () => {
       method
     };
     setTransactions(prev => [tx, ...prev]);
-    addLog(`Withdrawal initialized: ${amount.toLocaleString()} USD via ${method}`, 'info');
+    addLog(`Withdrawal initialized: $${amount.toLocaleString()}`, 'info');
     
     setTimeout(() => {
       setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, status: 'completed' } : t));
-      addLog(`Payout successful for transaction ${tx.id}`, 'success');
-    }, 5000);
+      addLog(`Withdrawal completed!`, 'success');
+    }, 4000);
   };
 
   const runScraper = async () => {
     if (isScraping) return;
     setIsScraping(true);
     addLog(t.scraping, 'info');
-    let newItemsFound = 0;
+    let totalAdded = 0;
     
     try {
       const activeSources = sources.filter(s => s.isActive);
       for (const source of activeSources) {
-        addLog(language === 'en' ? `Scanning Feed: ${source.name}...` : `Memindai Feed: ${source.name}...`, 'info');
-        
-        try {
-          const rawItems = await simulateScraping(source.name);
-          const scoredItems = await scoreOpportunities(rawItems, source.type, source.name, language);
+        addLog(`${t.activePulling}: ${source.name}`, 'info');
+        const rawItems = await simulateScraping(source.name);
+        if (!rawItems || rawItems.length === 0) continue;
 
-          const newOpps: Opportunity[] = scoredItems.map((item, idx) => ({
-            id: `opt-${Date.now()}-${idx}`,
-            title: item.title || 'Untitled',
-            description: item.description || '',
-            sourceId: source.id,
-            sourceName: source.name,
-            link: '#',
-            score: item.score || 0,
-            reasoning: item.reasoning || '',
-            timestamp: new Date().toISOString(),
-            category: item.category || 'General',
-            type: source.type,
-            financialValue: item.financialValue || 0,
-            isPremium: item.isPremium || false,
-            riskLevel: (item.riskLevel as RiskLevel) || 'Moderate',
-            timeHorizon: (item.timeHorizon as any) || 'Short-term',
-            status: 'Open'
-          }));
+        const scoredItems = await scoreOpportunities(rawItems, source.type, source.name, language);
 
-          newItemsFound += newOpps.length;
-          setOpportunities(prev => [...newOpps, ...prev].slice(0, 500));
-          setSources(prev => prev.map(s => s.id === source.id ? { ...s, lastRun: new Date().toISOString() } : s));
-        } catch (sourceError: any) {
-          addLog(`${source.name}: ${sourceError.message}`, 'error');
+        const newOpps: Opportunity[] = scoredItems.map((item, idx) => ({
+          id: `opt-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+          title: item.title || 'Signal detected',
+          description: item.description || '',
+          sourceId: source.id,
+          sourceName: source.name,
+          link: '#',
+          score: item.score || 0,
+          reasoning: item.reasoning || '',
+          timestamp: new Date().toISOString(),
+          category: item.category || 'Market',
+          type: source.type,
+          financialValue: item.financialValue || 0,
+          isPremium: (item.score || 0) > 85,
+          riskLevel: (item.riskLevel as RiskLevel) || 'Moderate',
+          timeHorizon: (item.timeHorizon as any) || 'Short-term',
+          status: 'Open'
+        }));
+
+        if (newOpps.length > 0) {
+          totalAdded += newOpps.length;
+          setOpportunities(prev => {
+            // Deduplicate by title to prevent spamming
+            const existingTitles = new Set(prev.map(o => o.title));
+            const filteredNew = newOpps.filter(o => !existingTitles.has(o.title));
+            return [...filteredNew, ...prev].slice(0, 500);
+          });
         }
       }
       
-      if (newItemsFound > 0) {
-        chatBotRef.current?.triggerBriefing(`I have found ${newItemsFound} new alpha signals. Our potential ROI has increased by $${(newItemsFound * 50000).toLocaleString()}.`);
+      if (totalAdded > 0) {
+        addLog(`Scan complete. ${totalAdded} signals identified.`, 'success');
+        chatBotRef.current?.triggerBriefing(`Market scan complete. Identified ${totalAdded} high-potential business signals.`);
+      } else {
+        addLog("Scan complete. No new signals detected.", 'info');
       }
     } catch (error) {
-      addLog(`Global Error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+      addLog(`System failure: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
     } finally {
       setIsScraping(false);
     }
   };
-
-  const handleAddManualOpportunity = (newOpp: Opportunity) => {
-    setOpportunities(prev => [{...newOpp, status: 'Open'}, ...prev]);
-    addLog(language === 'en' ? `Manually added alpha signal: ${newOpp.title}` : `Menambahkan sinyal alpha manual: ${newOpp.title}`, 'success');
-  };
-
-  const totalPotentialROI = useMemo(() => {
-    return opportunities.filter(o => o.status === 'Open').reduce((acc, curr) => acc + curr.financialValue, 0);
-  }, [opportunities]);
 
   const processedOpportunities = useMemo(() => {
     let filtered = opportunities.filter(o => 
@@ -218,23 +210,23 @@ const App: React.FC = () => {
         <Header 
           searchQuery={searchQuery} 
           setSearchQuery={setSearchQuery} 
-          totalOpps={totalPotentialROI}
+          totalOpps={opportunities.filter(o => o.status === 'Open').reduce((acc, c) => acc + c.financialValue, 0)}
           language={language}
           opportunities={opportunities}
         />
         
-        <main className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-[#070b14]">
+        <main className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           {activeTab === 'opportunities' && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/30 p-4 rounded-2xl border border-slate-800/50">
                 <div className="flex items-center gap-4">
                   <div className="text-[11px] text-slate-500 font-black uppercase tracking-widest">
-                    {t.showing} <span className="text-indigo-400 font-black">{pagedOpportunities.length}</span> {t.of} <span className="text-white font-black">{processedOpportunities.length}</span> {t.results}
+                    {t.showing} <span className="text-indigo-400">{pagedOpportunities.length}</span> {t.of} <span className="text-white">{processedOpportunities.length}</span> {t.results}
                   </div>
                   <select 
                     value={riskFilter} 
                     onChange={(e) => setRiskFilter(e.target.value as any)}
-                    className="bg-slate-800 border border-slate-700 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                    className="bg-slate-800 border border-slate-700 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl text-slate-300 focus:outline-none"
                   >
                     <option value="All">All Risks</option>
                     <option value="Low">Low Risk</option>
@@ -244,19 +236,13 @@ const App: React.FC = () => {
                   </select>
                 </div>
                 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button 
-                    onClick={() => setIsManualModalOpen(true)}
-                    className="px-4 py-2 rounded-xl bg-indigo-600/10 border border-indigo-600/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600/20 transition-all flex items-center gap-2"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setIsManualModalOpen(true)} className="px-4 py-2 rounded-xl bg-indigo-600/10 border border-indigo-600/20 text-indigo-400 text-[10px] font-black uppercase">
                     {t.addOpportunity}
                   </button>
-                  
-                  <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-2xl border border-slate-800 backdrop-blur-md shadow-inner">
-                    <button onClick={() => setSortBy('date')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${sortBy === 'date' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>{t.newest}</button>
-                    <button onClick={() => setSortBy('score')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${sortBy === 'score' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-slate-300'}`}>{t.highestScore}</button>
-                    <button onClick={() => setSortBy('value')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${sortBy === 'value' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:text-slate-300'}`}>{t.potentialValue}</button>
+                  <div className="flex bg-slate-900/50 p-1 rounded-2xl border border-slate-800">
+                    <button onClick={() => setSortBy('date')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase ${sortBy === 'date' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>{t.newest}</button>
+                    <button onClick={() => setSortBy('score')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase ${sortBy === 'score' ? 'bg-amber-500 text-black' : 'text-slate-500'}`}>{t.highestScore}</button>
                   </div>
                 </div>
               </div>
@@ -267,24 +253,19 @@ const App: React.FC = () => {
                     <OpportunityList opportunities={[opp]} language={language} />
                     {opp.status === 'Open' && (
                       <button 
-                        onClick={(e) => { e.stopPropagation(); executeOpportunity(opp.id); }}
-                        className="absolute bottom-6 right-20 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-black uppercase py-2 px-4 rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95"
+                        onClick={() => executeOpportunity(opp.id)}
+                        className="absolute bottom-6 right-20 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-black uppercase py-2 px-4 rounded-xl shadow-lg transition-all active:scale-95"
                       >
                         {t.markAsCashed}
                       </button>
-                    )}
-                    {opp.status === 'Executed' && (
-                      <div className="absolute top-4 right-4 bg-emerald-500 text-white p-1 rounded-full shadow-lg">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-                      </div>
                     )}
                   </div>
                 ))}
               </div>
               
               {visibleCount < processedOpportunities.length && (
-                <div className="flex justify-center pt-8 pb-12">
-                  <button onClick={() => setVisibleCount(prev => prev + ITEMS_PER_PAGE)} className="px-12 py-4 rounded-3xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">{t.loadMore}</button>
+                <div className="flex justify-center pt-8">
+                  <button onClick={() => setVisibleCount(p => p + ITEMS_PER_PAGE)} className="px-12 py-4 rounded-3xl bg-slate-800 hover:bg-slate-700 text-white font-black text-xs uppercase tracking-widest">{t.loadMore}</button>
                 </div>
               )}
             </div>
@@ -293,21 +274,14 @@ const App: React.FC = () => {
           {activeTab === 'analytics' && <AnalyticsTab opportunities={opportunities} language={language} />}
           {activeTab === 'vault' && <VaultTab language={language} balance={walletBalance} transactions={transactions} onWithdraw={handleWithdraw} />}
           {activeTab === 'sources' && <SourceManager sources={sources} language={language} onAdd={(d) => setSources(prev => [...prev, { ...d, id: Math.random().toString(36).substr(2, 9), isActive: true }])} onUpdate={(u) => setSources(prev => prev.map(s => s.id === u.id ? u : s))} onDelete={(id) => setSources(prev => prev.filter(s => s.id !== id))} onToggleActive={(id) => setSources(prev => prev.map(s => s.id === id ? { ...s, isActive: !s.isActive } : s))} />}
-
           {activeTab === 'logs' && (
             <div className="max-w-4xl mx-auto space-y-6">
-              <div className="flex justify-between items-center mb-6 bg-slate-900/50 p-6 rounded-3xl border border-slate-800">
-                <div className="flex flex-col">
-                  <h2 className="text-xl font-black uppercase tracking-widest text-white">{t.systemLogs}</h2>
-                </div>
-                <button onClick={() => setLogs([])} className="px-6 py-3 rounded-xl bg-slate-800 border border-slate-700 text-[10px] font-black text-slate-400 hover:text-white uppercase tracking-widest transition-all active:scale-95">{t.clearLogs}</button>
-              </div>
-              <div className="bg-[#0f172a] rounded-3xl border border-slate-800 p-8 font-mono text-[11px] h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar shadow-2xl relative">
+              <div className="bg-[#0f172a] rounded-3xl border border-slate-800 p-8 font-mono text-[11px] h-[calc(100vh-200px)] overflow-y-auto custom-scrollbar">
                 {logs.map(log => (
-                  <div key={log.id} className="mb-4 flex gap-4 p-3 hover:bg-white/5 rounded-xl transition-all border border-transparent hover:border-slate-800 group">
-                    <span className="text-slate-600 shrink-0 font-bold">[{log.timestamp}]</span>
-                    <span className={`font-black shrink-0 uppercase tracking-tighter ${log.level === 'error' ? 'text-rose-400' : log.level === 'success' ? 'text-emerald-400' : 'text-sky-400'}`}>{log.level}</span>
-                    <span className="text-slate-300 leading-relaxed">{log.message}</span>
+                  <div key={log.id} className="mb-2 flex gap-4">
+                    <span className="text-slate-600">[{log.timestamp}]</span>
+                    <span className={`font-bold ${log.level === 'error' ? 'text-rose-400' : log.level === 'success' ? 'text-emerald-400' : 'text-sky-400'}`}>{log.level.toUpperCase()}</span>
+                    <span className="text-slate-300">{log.message}</span>
                   </div>
                 ))}
               </div>
@@ -317,8 +291,8 @@ const App: React.FC = () => {
       </div>
 
       <ScraperPanel isScraping={isScraping} logs={logs.slice(0, 5)} language={language} />
-      <ManualOpportunityForm language={language} isOpen={isManualModalOpen} onClose={() => setIsManualModalOpen(false)} onAdd={handleAddManualOpportunity} />
-      <ChatBot ref={chatBotRef} language={language} opportunities={opportunities} totalROI={totalPotentialROI} onExecuteScan={runScraper} onNavigate={(tab) => setActiveTab(tab as any)} onSearch={(q) => setSearchQuery(q)} />
+      <ManualOpportunityForm language={language} isOpen={isManualModalOpen} onClose={() => setIsManualModalOpen(false)} onAdd={(o) => setOpportunities(p => [o, ...p])} />
+      <ChatBot ref={chatBotRef} language={language} opportunities={opportunities} totalROI={opportunities.reduce((acc, c) => acc + c.financialValue, 0)} onExecuteScan={runScraper} onNavigate={(tab) => setActiveTab(tab as any)} onSearch={(q) => setSearchQuery(q)} />
     </div>
   );
 };

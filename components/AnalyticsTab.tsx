@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { Opportunity, Language } from '../types';
-import { translations } from '../translations';
+import { Opportunity, Language } from '../types.ts';
+import { translations } from '../translations.ts';
 
 interface AnalyticsTabProps {
   opportunities: Opportunity[];
@@ -16,9 +16,9 @@ const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ opportunities, language }) 
     return acc;
   }, {} as Record<string, number>);
 
-  // Fix: Explicitly cast entries to [string, number][] to ensure arithmetic operations like b[1] - a[1] are valid.
+  // Explicitly cast entries to [string, number][] to ensure arithmetic operations like b[1] - a[1] are valid.
   const sortedCategories = (Object.entries(categoryROI) as [string, number][]).sort((a, b) => b[1] - a[1]);
-  // Fix: Explicitly cast values to number[] to ensure they can be spread into Math.max as numbers.
+  // Explicitly cast values to number[] to ensure they can be spread into Math.max as numbers.
   const maxROI = Math.max(...(Object.values(categoryROI) as number[]), 1);
 
   const scoreBuckets = [0, 20, 40, 60, 80, 100];
@@ -51,7 +51,6 @@ const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ opportunities, language }) 
                 <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                    <div 
                     className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 transition-all duration-1000" 
-                    // Fix: Arithmetic operations now use typed number values from sortedCategories and maxROI.
                     style={{ width: `${(val / maxROI) * 100}%` }}
                    ></div>
                 </div>

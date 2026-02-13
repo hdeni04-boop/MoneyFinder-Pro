@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
-import { Opportunity, CollectorType, Language, RiskLevel, TimeHorizon } from '../types';
-import { translations } from '../translations';
+import { Opportunity, CollectorType, Language, RiskLevel, TimeHorizon } from '../types.ts';
+import { translations } from '../translations.ts';
 
 interface ManualOpportunityFormProps {
   language: Language;

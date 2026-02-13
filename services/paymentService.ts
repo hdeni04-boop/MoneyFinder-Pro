@@ -10,6 +10,20 @@ export const validateAccountNumber = (bankCode: string, accountNumber: string): 
   return re.test(accountNumber);
 };
 
+// Safe access to environment variables in browser environments
+const getEnvVar = (key: string): string | undefined => {
+  try {
+    // Attempt to access process.env safely
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env[key];
+    }
+    // Fallback to globalThis if process is not directly available
+    return (globalThis as any).process?.env?.[key];
+  } catch (e) {
+    return undefined;
+  }
+};
+
 export const processRealWithdrawal = async (data: {
   amount: number,
   bankCode: string,
@@ -22,8 +36,8 @@ export const processRealWithdrawal = async (data: {
     throw new Error("Format nomor rekening tidak valid. Pastikan hanya angka 8-16 digit.");
   }
 
-  // 2. Ambil Key dari Environment (Injected automatically)
-  const XENDIT_SECRET_KEY = process.env.XENDIT_KEY || 'YOUR_KEY_HERE';
+  // 2. Ambil Key dari Environment
+  const XENDIT_SECRET_KEY = getEnvVar('XENDIT_KEY') || 'YOUR_KEY_HERE';
 
   console.log(`[GATEWAY] Memulai transfer sebesar $${data.amount} ke ${data.bankCode}...`);
 
