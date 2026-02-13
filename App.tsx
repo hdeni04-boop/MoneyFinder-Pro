@@ -129,7 +129,6 @@ const App: React.FC = () => {
       try {
         addLog(`${t.activePulling}: ${source.name}`, 'info');
         
-        // Update lastRun timestamp
         const currentTimestamp = new Date().toISOString();
         setSources(prev => prev.map(s => s.id === source.id ? { ...s, lastRun: currentTimestamp } : s));
 
@@ -304,7 +303,15 @@ const App: React.FC = () => {
 
       <ScraperPanel isScraping={isScraping} logs={logs.slice(0, 5)} language={language} />
       <ManualOpportunityForm language={language} isOpen={isManualModalOpen} onClose={() => setIsManualModalOpen(false)} onAdd={(o) => setOpportunities(p => [o, ...p])} />
-      <ChatBot ref={chatBotRef} language={language} opportunities={opportunities} totalROI={opportunities.reduce((acc, c) => acc + c.financialValue, 0)} onExecuteScan={runScraper} onNavigate={(tab) => setActiveTab(tab)} onSearch={(q) => setSearchQuery(q)} />
+      <ChatBot 
+        ref={chatBotRef} 
+        language={language} 
+        opportunities={opportunities} 
+        totalROI={opportunities.reduce((acc, c) => acc + c.financialValue, 0)} 
+        onExecuteScan={runScraper} 
+        onNavigate={(tab) => setActiveTab(tab as AppTab)} 
+        onSearch={(q) => setSearchQuery(q)} 
+      />
     </div>
   );
 };

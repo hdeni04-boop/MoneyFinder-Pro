@@ -5,15 +5,14 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const cleanJsonResponse = (text: string): string => {
   if (!text) return "{}";
-  // Menghapus blok kode markdown jika ada
+  // Hapus blok markdown ```json ... ```
   let cleaned = text.replace(/```json/gi, '').replace(/```/gi, '').trim();
   
-  // Mencari karakter awal JSON '{' atau '['
+  // Cari index awal dan akhir JSON yang valid
   const startIdx = Math.min(
     cleaned.indexOf('{') === -1 ? Infinity : cleaned.indexOf('{'),
     cleaned.indexOf('[') === -1 ? Infinity : cleaned.indexOf('[')
   );
-  // Mencari karakter akhir JSON '}' atau ']'
   const endIdx = Math.max(
     cleaned.lastIndexOf('}'),
     cleaned.lastIndexOf(']')
@@ -32,7 +31,6 @@ const callWithRetry = async (fn: () => Promise<any>, maxRetries = 3) => {
       lastError = error;
       const isQuotaError = error?.message?.includes('429') || error?.status === 429 || error?.message?.includes('quota');
       if (isQuotaError) {
-        // Exponential backoff
         await sleep(Math.pow(2, i) * 1000 + 1000);
         continue;
       }
@@ -74,8 +72,7 @@ export const scoreOpportunities = async (rawItems: any[], sourceType: CollectorT
     }));
 
     const text = response.text || "[]";
-    const jsonStr = cleanJsonResponse(text);
-    return JSON.parse(jsonStr).map((r: any) => ({ 
+    return JSON.parse(cleanJsonResponse(text)).map((r: any) => ({ 
       ...r, 
       isPremium: r.score > 85,
       id: `opt-${Math.random().toString(36).substr(2, 9)}`
@@ -121,10 +118,10 @@ export const analyzeVideo = async (videoBase64: string, mimeType: string, lang: 
   const prompt = `Analyze this business/market intelligence video and extract critical insights. 
   Language: ${lang === 'id' ? 'Indonesian' : 'English'}.
   Provide the output in JSON format with these exact keys:
-  - mainTopic: String (The core narrative of the video)
-  - keyTakeaways: Array of Strings (At least 3 critical points)
-  - identifiedOpportunities: Array of Strings (Potential business or investment leads)
-  - riskAssessment: String (Overall risk profile based on the content)`;
+  - mainTopic: String
+  - keyTakeaways: Array of Strings
+  - identifiedOpportunities: Array of Strings
+  - riskAssessment: String`;
 
   try {
     const response = await callWithRetry(() => ai.models.generateContent({
